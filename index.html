@@ -1,0 +1,882 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Notion CSV Import Sanitizer — Free, Fast &amp; 100% Client-Side</title>
+    <meta
+      name="description"
+      content="Fix messy CSVs for Notion import: normalize dates to ISO 8601, shield unescaped commas, trim headers, and strip control characters 100% locally in your browser."
+    />
+    <meta name="keywords" content="notion csv cleaner, notion import sanitizer, fix csv for notion, format date iso 8601 csv, clean csv online, client side csv sanitizer" />
+    <meta name="author" content="GreenTools" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#ffffff" />
+
+    <!-- OpenGraph Meta Tags -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Notion CSV Import Sanitizer — Fix Dates &amp; Commas" />
+    <meta
+      property="og:description"
+      content="Sanitize CSV files for seamless Notion database imports. 100% private in-browser tool."
+    />
+    <meta property="og:site_name" content="GreenTools" />
+
+    <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS CDN & Lucide Icons CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+              mono: ['"JetBrains Mono"', 'monospace'],
+            },
+          },
+        },
+      };
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Structured JSON-LD Schema: WebApplication & FAQPage -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Notion CSV Import Sanitizer",
+            "operatingSystem": "All",
+            "applicationCategory": "ProductivityApplication",
+            "browserRequirements": "Requires JavaScript and HTML5 FileReader API support.",
+            "description": "Sanitize and prepare CSV files for instant error-free import into Notion databases.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "featureList": [
+              "Automatic ISO 8601 (YYYY-MM-DD) date conversion",
+              "Comma and quote shielding for Notion multi-select & text",
+              "Trims whitespace and strips non-UTF8 control characters",
+              "Interactive diff viewer highlighting modified cells",
+              "One-click Download Notion-Ready CSV",
+              "100% Client-side local parsing"
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Why do CSV imports frequently fail or misalign in Notion?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Notion databases require strict RFC-4180 compliant CSV formatting. Unquoted commas inside notes or addresses break column alignments, non-standard date formats (e.g. DD/MM/YYYY or text month strings) fail Notion's Date property recognition, and zero-width or control characters corrupt database properties."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "What sanitization fixes does this tool apply?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "This tool trims table headers, strips illegal Unicode and ASCII control characters, wraps comma-bearing text cells in standard double quotes, normalizes dates into ISO 8601 (YYYY-MM-DD), and removes trailing blank rows."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is my CSV data uploaded to any remote server?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. The entire cleaning and diff process is executed locally inside your web browser using HTML5 FileReader. Your confidential database rows never touch external servers."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Does this support large CSV files?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes, standard datasets up to tens of thousands of rows parse smoothly in browser memory within milliseconds."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      :root {
+        --grid-line: rgba(15, 23, 42, 0.04);
+      }
+      .bg-subtle-grid {
+        background-size: 24px 24px;
+        background-image:
+          linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      }
+      .custom-scroll::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .custom-scroll::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.3);
+        border-radius: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb:hover {
+        background: rgba(148, 163, 184, 0.5);
+      }
+    </style>
+  </head>
+
+  <body class="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-slate-900 selection:text-white bg-subtle-grid flex flex-col justify-between">
+    <!-- Header -->
+    <header class="border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 z-30">
+      <div class="max-w-[1360px] mx-auto flex items-center justify-between gap-6 px-4 sm:px-6 py-3.5">
+        <a href="#app" class="flex items-center gap-2.5 text-base font-bold tracking-tight text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 rounded">
+          <div class="w-7 h-7 rounded-lg bg-slate-900 flex items-center justify-center text-white shadow-xs">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          </div>
+          <span>GreenTools <span class="text-xs font-normal text-slate-400">/ Notion CSV Cleaner</span></span>
+        </a>
+
+        <nav aria-label="Quick links" class="hidden sm:flex items-center gap-6 text-xs sm:text-sm font-medium text-slate-600">
+          <a href="#how-to-use" class="hover:text-slate-900 transition-colors">How It Works</a>
+          <a href="#privacy" class="hover:text-slate-900 transition-colors">Privacy</a>
+          <a href="#faq" class="hover:text-slate-900 transition-colors">FAQ</a>
+        </nav>
+
+        <div class="flex items-center gap-2">
+          <button
+            id="btn-sample-top"
+            type="button"
+            class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap"
+          >
+            Try Messy Sample
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main id="app" class="max-w-[1360px] mx-auto w-full px-4 sm:px-6 py-8 sm:py-12 flex-1">
+      
+      <!-- Drop Zone & Hero -->
+      <section id="drop-view" class="max-w-2xl mx-auto text-center pt-2 sm:pt-6 pb-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200/80 rounded-full mb-4">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 shrink-0"></i>
+          <span>100% Private · Cleaned locally in your browser memory</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-5xl font-bold tracking-tight text-slate-900">
+          Notion CSV Import Sanitizer
+        </h1>
+
+        <p class="mt-3 text-base sm:text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
+          Fix broken column breaks, normalize non-standard dates to ISO 8601, trim headers, and strip illegal characters before importing into Notion.
+        </p>
+
+        <!-- Drag & Drop Container -->
+        <div
+          id="dropzone"
+          class="mt-8 border-2 border-dashed border-slate-300 hover:border-slate-800 bg-white rounded-2xl p-8 sm:p-12 shadow-xs transition-all duration-150 cursor-pointer group"
+        >
+          <div class="w-14 h-14 rounded-2xl bg-slate-100 text-slate-800 flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform duration-150">
+            <i data-lucide="upload-cloud" class="w-7 h-7"></i>
+          </div>
+
+          <p class="text-lg font-semibold text-slate-900">
+            Drag and drop your messy CSV file here
+          </p>
+          <p class="mt-1 text-xs sm:text-sm text-slate-500">
+            Supports .csv, .tsv, and raw text spreadsheets
+          </p>
+
+          <div class="mt-6">
+            <label
+              for="file-input"
+              class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <i data-lucide="folder-open" class="w-4 h-4"></i>
+              <span>Browse CSV file</span>
+              <input
+                id="file-input"
+                type="file"
+                accept=".csv,.tsv,.txt"
+                class="sr-only"
+              />
+            </label>
+          </div>
+
+          <div class="mt-6 pt-5 border-t border-slate-100 flex flex-wrap items-center justify-center gap-4 text-xs text-slate-500">
+            <span>Or press <kbd class="px-1.5 py-0.5 font-mono text-[11px] bg-slate-100 rounded border border-slate-200">Ctrl+V</kbd> to paste</span>
+            <span>·</span>
+            <button
+              id="btn-sample-drop"
+              type="button"
+              class="text-indigo-600 font-medium hover:underline"
+            >
+              Load messy sample data
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Workspace & Diff Preview (Progressive Disclosure) -->
+      <section id="workspace-view" class="hidden transition-all duration-300">
+        <!-- Top Metric Bar -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs mb-6">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <span id="label-filename" class="font-bold text-sm text-slate-900 truncate max-w-xs">dataset.csv</span>
+              <span class="text-slate-300">·</span>
+              <span id="label-counts" class="text-xs font-mono text-slate-600">0 rows · 0 cols</span>
+              <span class="text-slate-300">·</span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                <span id="label-fixes-count">0 fixes applied</span>
+              </span>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                id="btn-toggle-filter"
+                type="button"
+                class="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Showing All Rows
+              </button>
+              <button
+                id="btn-copy-csv"
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span id="copy-btn-text">Copy CSV</span>
+              </button>
+              <button
+                id="btn-download-clean"
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs transition-colors"
+              >
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Download Notion-Ready CSV</span>
+              </button>
+              <button
+                id="btn-open-another"
+                type="button"
+                class="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors"
+                title="Open another file"
+              >
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fixes Breakdown Chips -->
+          <div id="fixes-chips" class="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-2 text-[11px]">
+            <!-- Dynamically populated chips -->
+          </div>
+        </div>
+
+        <!-- Diff Table Container -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+          <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
+            <div class="flex items-center gap-2 font-semibold text-slate-800">
+              <i data-lucide="table" class="w-4 h-4"></i>
+              <span>Sanitized Data Preview (Modified cells highlighted in yellow)</span>
+            </div>
+            <span class="text-[11px] text-slate-500">Notion will parse dates as native calendar dates &amp; multi-line notes correctly</span>
+          </div>
+
+          <div class="overflow-x-auto max-h-[500px] custom-scroll">
+            <table class="w-full text-left text-xs">
+              <thead id="table-head" class="bg-slate-50 text-slate-700 font-semibold sticky top-0 border-b border-slate-200">
+                <!-- Dynamically generated headers -->
+              </thead>
+              <tbody id="table-body" class="divide-y divide-slate-100">
+                <!-- Dynamically generated rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Sponsor Slot Container -->
+      <aside
+        id="sponsor-slot"
+        aria-label="Product Recommendation"
+        class="mt-12 max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs"
+      >
+        <div class="flex items-center gap-3.5">
+          <div class="w-9 h-9 rounded-lg bg-slate-100 text-slate-900 flex items-center justify-center shrink-0">
+            <i data-lucide="database" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-[11px] font-semibold text-slate-900 uppercase tracking-wider">
+              Productivity Stack
+            </div>
+            <p class="text-xs sm:text-sm font-medium text-slate-800 mt-0.5">
+              Managing complex Notion databases and recurring automations?
+            </p>
+            <p class="text-xs text-slate-500">
+              Keep workspace templates clean and standardized without manual spreadsheet repairs.
+            </p>
+          </div>
+        </div>
+        <a
+          href="#how-to-use"
+          class="px-3.5 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors whitespace-nowrap shrink-0 self-end sm:self-center"
+        >
+          Learn more
+        </a>
+      </aside>
+
+      <!-- How to Use Documentation -->
+      <article id="how-to-use" class="mt-16 pt-10 border-t border-slate-200 max-w-3xl mx-auto">
+        <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          How to Sanitize CSV Files for Notion
+        </h2>
+        <p class="mt-2 text-sm text-slate-600 leading-relaxed">
+          Notion is notoriously strict about CSV formatting. Follow this 3-step pipeline to guarantee flawless database imports:
+        </p>
+
+        <div class="mt-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-slate-100 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</div>
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">Drop or Paste Your Raw CSV</h3>
+              <p class="text-xs text-slate-600 mt-0.5">
+                Drag your exported spreadsheet into the sanitizer. It instantly parses headers, rows, and detects formatting incompatibilities.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-slate-100 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</div>
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">Inspect the Highlighted Fixes</h3>
+              <p class="text-xs text-slate-600 mt-0.5">
+                The diff engine highlights corrected date strings (standardized to ISO 8601 <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">YYYY-MM-DD</code>), shielded commas inside text descriptions, and trimmed headers.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-slate-100 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</div>
+            <div>
+              <h3 class="text-sm font-semibold text-slate-900">Download &amp; Import Directly into Notion</h3>
+              <p class="text-xs text-slate-600 mt-0.5">
+                Click <strong>Download Notion-Ready CSV</strong>, open your Notion page, click <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">... &gt; Merge with CSV</code> or <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">Import CSV</code>, and enjoy perfectly matched columns and native date filters.
+              </p>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Privacy Guarantee -->
+      <section id="privacy" class="mt-14 pt-10 border-t border-slate-200 max-w-3xl mx-auto">
+        <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+          Privacy &amp; Security Guarantee
+        </h2>
+        <div class="mt-4 p-4 rounded-xl bg-slate-100/70 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+          Spreadsheets frequently contain sensitive customer contacts, project roadmaps, and business data. This sanitizer performs 100% of parsing, normalization, and CSV generation directly in your web browser. Nothing is ever sent to or processed by an external server.
+        </div>
+      </section>
+
+      <!-- FAQ Section -->
+      <section id="faq" class="mt-14 pt-10 border-t border-slate-200 max-w-3xl mx-auto">
+        <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mb-6">
+          Frequently Asked Questions
+        </h2>
+
+        <div class="space-y-4">
+          <div class="p-4 bg-white border border-slate-200 rounded-xl">
+            <h3 class="text-sm font-semibold text-slate-900">Why does Notion mix up my columns when I import a CSV?</h3>
+            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              If a field contains a comma (like an address or a list of tags) and isn't strictly enclosed in RFC-4180 quotes, Notion interprets the comma as a new column separator, shifting every subsequent column to the right.
+            </p>
+          </div>
+
+          <div class="p-4 bg-white border border-slate-200 rounded-xl">
+            <h3 class="text-sm font-semibold text-slate-900">Why are my dates imported as plain text instead of Notion Date properties?</h3>
+            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              Notion's date parser reliably recognizes ISO 8601 (<code class="font-mono bg-slate-100 px-1 py-0.5 rounded">YYYY-MM-DD</code>). Formats like <code class="font-mono bg-slate-100 px-1 py-0.5 rounded">03/12/2026</code> often cause month/day confusion or get categorized as regular text fields.
+            </p>
+          </div>
+
+          <div class="p-4 bg-white border border-slate-200 rounded-xl">
+            <h3 class="text-sm font-semibold text-slate-900">What happens to non-UTF-8 and control characters?</h3>
+            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              Hidden control characters (such as null bytes, bell codes, and byte-order markers) are safely stripped away to prevent import errors in Notion.
+            </p>
+          </div>
+
+          <div class="p-4 bg-white border border-slate-200 rounded-xl">
+            <h3 class="text-sm font-semibold text-slate-900">Can I run this offline?</h3>
+            <p class="text-xs text-slate-600 mt-1.5 leading-relaxed">
+              Yes. All logic is self-contained and functions fully without internet connectivity.
+            </p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-200/80 bg-white py-6 text-xs text-slate-500">
+      <div class="max-w-[1360px] mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p>GreenTools · 100% Client-Side Notion CSV Sanitizer</p>
+        <div class="flex items-center gap-5">
+          <a href="#app" class="hover:text-slate-900 transition-colors">Back to top</a>
+          <a href="#how-to-use" class="hover:text-slate-900 transition-colors">How It Works</a>
+          <a href="#privacy" class="hover:text-slate-900 transition-colors">Privacy</a>
+          <a href="#faq" class="hover:text-slate-900 transition-colors">FAQ</a>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Client-Side Engine Script -->
+    <script>
+      (function () {
+        'use strict';
+
+        var SAMPLE_CSV = [
+          'Task Name , Due Date , Category , Notes, Completed',
+          'Launch Q4 Campaign, 11/24/2026 , Marketing, "Requires Facebook, Google, and TikTok review", yes',
+          'Review Legal Contract, 2026/04/15, Operations, "Check clauses 4, 7, and 12", false',
+          'Product Design Sync, Dec 5 2026 , Product, Meet with Emma, Liam, and Sophia, true',
+          'Server Migration, 08-14-2026, Engineering, Complete before midnight cut-over, NO',
+          'Update Financials, 3/9/2026, Finance, Review Stripe, Paypal, and wire payouts, true'
+        ].join('\n');
+
+        var dropzone = document.getElementById('dropzone');
+        var fileInput = document.getElementById('file-input');
+        var dropView = document.getElementById('drop-view');
+        var workspaceView = document.getElementById('workspace-view');
+        var btnSampleTop = document.getElementById('btn-sample-top');
+        var btnSampleDrop = document.getElementById('btn-sample-drop');
+        var btnOpenAnother = document.getElementById('btn-open-another');
+        var btnToggleFilter = document.getElementById('btn-toggle-filter');
+        var btnCopyCsv = document.getElementById('btn-copy-csv');
+        var copyBtnText = document.getElementById('copy-btn-text');
+        var btnDownloadClean = document.getElementById('btn-download-clean');
+
+        var labelFilename = document.getElementById('label-filename');
+        var labelCounts = document.getElementById('label-counts');
+        var labelFixesCount = document.getElementById('label-fixes-count');
+        var fixesChips = document.getElementById('fixes-chips');
+        var tableHead = document.getElementById('table-head');
+        var tableBody = document.getElementById('table-body');
+
+        var appState = {
+          fileName: 'dataset.csv',
+          originalHeaders: [],
+          sanitizedHeaders: [],
+          originalRows: [],
+          sanitizedRows: [],
+          cellModifications: {}, // 'r-c': { oldVal, newVal, reason }
+          stats: { dates: 0, commas: 0, headers: 0, controls: 0, booleans: 0 },
+          filterOnlyModified: false
+        };
+
+        // Robust CSV Parser handling quotes and delimiters
+        function parseCsvText(text) {
+          var lines = [];
+          var row = [''];
+          var inQuotes = false;
+          var i = 0;
+          var len = text.length;
+
+          while (i < len) {
+            var ch = text[i];
+            var next = text[i + 1];
+
+            if (inQuotes) {
+              if (ch === '"' && next === '"') {
+                row[row.length - 1] += '"';
+                i += 2;
+                continue;
+              } else if (ch === '"') {
+                inQuotes = false;
+                i++;
+                continue;
+              } else {
+                row[row.length - 1] += ch;
+                i++;
+                continue;
+              }
+            } else {
+              if (ch === '"') {
+                inQuotes = true;
+                i++;
+                continue;
+              } else if (ch === ',') {
+                row.push('');
+                i++;
+                continue;
+              } else if (ch === '\r') {
+                if (next === '\n') i++;
+                lines.push(row);
+                row = [''];
+                i++;
+                continue;
+              } else if (ch === '\n') {
+                lines.push(row);
+                row = [''];
+                i++;
+                continue;
+              } else {
+                row[row.length - 1] += ch;
+                i++;
+                continue;
+              }
+            }
+          }
+          if (row.length > 1 || (row.length === 1 && row[0].trim() !== '')) {
+            lines.push(row);
+          }
+          return lines;
+        }
+
+        // Clean text from control chars and zero-width spaces
+        function stripControlChars(str) {
+          if (!str) return '';
+          return str
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\uFEFF]/g, '')
+            .replace(/[\u2018\u2019]/g, "'")
+            .replace(/[\u201C\u201D]/g, '"');
+        }
+
+        // Detect and convert dates to ISO 8601 YYYY-MM-DD
+        function tryNormalizeDate(val) {
+          var trimmed = val.trim();
+          if (!trimmed || trimmed.length < 6 || trimmed.length > 30) return null;
+
+          // Already ISO 8601: YYYY-MM-DD
+          if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            return null;
+          }
+
+          // Format: MM/DD/YYYY or M/D/YYYY
+          var mdy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+          if (mdy) {
+            var m = parseInt(mdy[1], 10);
+            var d = parseInt(mdy[2], 10);
+            var y = parseInt(mdy[3], 10);
+            if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+              return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            }
+          }
+
+          // Format: YYYY/MM/DD
+          var ymd = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+          if (ymd) {
+            var y = parseInt(ymd[1], 10);
+            var m = parseInt(ymd[2], 10);
+            var d = parseInt(ymd[3], 10);
+            if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+              return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            }
+          }
+
+          // Format: Month DD, YYYY or MMM D YYYY
+          var parsed = Date.parse(trimmed);
+          if (!isNaN(parsed) && /[a-zA-Z]/.test(trimmed)) {
+            var dt = new Date(parsed);
+            if (dt.getFullYear() > 1970 && dt.getFullYear() < 2100) {
+              return dt.toISOString().slice(0, 10);
+            }
+          }
+
+          return null;
+        }
+
+        function sanitizeData(rawRows) {
+          if (!rawRows || rawRows.length === 0) return;
+
+          appState.originalHeaders = rawRows[0].map(function (h) { return h.trim(); });
+          appState.sanitizedHeaders = [];
+          appState.stats = { dates: 0, commas: 0, headers: 0, controls: 0, booleans: 0 };
+          appState.cellModifications = {};
+
+          // Sanitize headers
+          appState.originalHeaders.forEach(function (h, idx) {
+            var cleanH = stripControlChars(h).trim();
+            if (cleanH !== h) appState.stats.headers++;
+            if (!cleanH) cleanH = 'Column_' + (idx + 1);
+            appState.sanitizedHeaders.push(cleanH);
+          });
+
+          var origBody = rawRows.slice(1);
+          appState.originalRows = origBody;
+          appState.sanitizedRows = [];
+
+          for (var r = 0; r < origBody.length; r++) {
+            var row = origBody[r];
+            var cleanRow = [];
+            for (var c = 0; c < appState.sanitizedHeaders.length; c++) {
+              var val = (row[c] !== undefined ? row[c] : '');
+              var oldVal = val;
+              var cleaned = stripControlChars(val).trim();
+
+              if (cleaned !== oldVal) {
+                appState.stats.controls++;
+              }
+
+              // Check Boolean normalization (Notion Checkbox: true / false)
+              var lower = cleaned.toLowerCase();
+              if (lower === 'yes' || lower === 'y') {
+                cleaned = 'true';
+                appState.stats.booleans++;
+              } else if (lower === 'no' || lower === 'n') {
+                cleaned = 'false';
+                appState.stats.booleans++;
+              }
+
+              // Check Date normalization
+              var isoDate = tryNormalizeDate(cleaned);
+              if (isoDate) {
+                cleaned = isoDate;
+                appState.stats.dates++;
+              }
+
+              // Check if comma inside
+              if (cleaned.indexOf(',') !== -1) {
+                appState.stats.commas++;
+              }
+
+              if (cleaned !== oldVal) {
+                appState.cellModifications[r + '-' + c] = {
+                  oldVal: oldVal,
+                  newVal: cleaned
+                };
+              }
+
+              cleanRow.push(cleaned);
+            }
+            appState.sanitizedRows.push(cleanRow);
+          }
+        }
+
+        function renderWorkspace() {
+          dropView.classList.add('hidden');
+          workspaceView.classList.remove('hidden');
+
+          labelFilename.textContent = appState.fileName;
+          labelCounts.textContent = appState.sanitizedRows.length + ' rows · ' + appState.sanitizedHeaders.length + ' cols';
+          
+          var totalFixes = Object.keys(appState.cellModifications).length + appState.stats.headers;
+          labelFixesCount.textContent = totalFixes + ' fixes applied';
+
+          // Fixes Chips
+          fixesChips.innerHTML = [
+            '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700"><strong>' + appState.stats.dates + '</strong> Dates to ISO 8601</span>',
+            '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700"><strong>' + appState.stats.commas + '</strong> Shielded Commas</span>',
+            '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700"><strong>' + appState.stats.headers + '</strong> Headers Trimmed</span>',
+            '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700"><strong>' + appState.stats.booleans + '</strong> Checkboxes Standardized</span>',
+            '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 text-slate-700"><strong>' + appState.stats.controls + '</strong> Control Chars Cleared</span>'
+          ].join('');
+
+          // Table Headers
+          tableHead.innerHTML = '<tr><th class="px-3 py-2.5 text-[11px] font-mono text-slate-400 w-10 text-center">#</th>' +
+            appState.sanitizedHeaders.map(function (h) {
+              return '<th class="px-3 py-2.5 text-xs font-semibold text-slate-800">' + escapeHtml(h) + '</th>';
+            }).join('') + '</tr>';
+
+          renderTableRows();
+          if (window.lucide && window.lucide.createIcons) {
+            window.lucide.createIcons();
+          }
+        }
+
+        function renderTableRows() {
+          var rowsHtml = [];
+          for (var r = 0; r < appState.sanitizedRows.length; r++) {
+            var isRowModified = false;
+            for (var c = 0; c < appState.sanitizedHeaders.length; c++) {
+              if (appState.cellModifications[r + '-' + c]) {
+                isRowModified = true;
+                break;
+              }
+            }
+
+            if (appState.filterOnlyModified && !isRowModified) {
+              continue;
+            }
+
+            var cellTds = [];
+            for (var c = 0; c < appState.sanitizedHeaders.length; c++) {
+              var val = appState.sanitizedRows[r][c];
+              var mod = appState.cellModifications[r + '-' + c];
+
+              if (mod) {
+                cellTds.push(
+                  '<td class="px-3 py-2 bg-amber-50/80 text-amber-950 font-medium border-l border-amber-200" title="Changed from: ' + escapeHtml(mod.oldVal) + '">' +
+                  '<div class="flex items-center justify-between gap-2">' +
+                  '<span>' + escapeHtml(val) + '</span>' +
+                  '<span class="text-[10px] font-mono px-1 py-0.2 bg-amber-200/60 rounded text-amber-800">Fixed</span>' +
+                  '</div></td>'
+                );
+              } else {
+                cellTds.push('<td class="px-3 py-2 text-slate-700 font-mono text-xs">' + escapeHtml(val) + '</td>');
+              }
+            }
+
+            rowsHtml.push(
+              '<tr class="hover:bg-slate-50/80 transition-colors">' +
+              '<td class="px-3 py-2 text-[11px] font-mono text-slate-400 text-center bg-slate-50/40">' + (r + 1) + '</td>' +
+              cellTds.join('') +
+              '</tr>'
+            );
+          }
+
+          if (rowsHtml.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="' + (appState.sanitizedHeaders.length + 1) + '" class="p-8 text-center text-slate-400">No modified rows found.</td></tr>';
+          } else {
+            tableBody.innerHTML = rowsHtml.join('');
+          }
+        }
+
+        function escapeHtml(str) {
+          if (!str) return '';
+          return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        function exportCsvString() {
+          function quoteCell(val) {
+            val = String(val === undefined || val === null ? '' : val);
+            if (val.indexOf('"') !== -1 || val.indexOf(',') !== -1 || val.indexOf('\n') !== -1 || val.indexOf('\r') !== -1) {
+              return '"' + val.replace(/"/g, '""') + '"';
+            }
+            return val;
+          }
+
+          var out = [];
+          out.push(appState.sanitizedHeaders.map(quoteCell).join(','));
+          appState.sanitizedRows.forEach(function (row) {
+            out.push(row.map(quoteCell).join(','));
+          });
+          return out.join('\r\n');
+        }
+
+        function handleFile(file) {
+          if (!file) return;
+          appState.fileName = file.name;
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            var rawText = e.target.result;
+            var parsed = parseCsvText(rawText);
+            sanitizeData(parsed);
+            renderWorkspace();
+          };
+          reader.readAsText(file);
+        }
+
+        // Event Listeners
+        fileInput.addEventListener('change', function (e) {
+          if (e.target.files && e.target.files[0]) {
+            handleFile(e.target.files[0]);
+          }
+        });
+
+        dropzone.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          dropzone.classList.add('border-slate-800', 'bg-slate-50');
+        });
+
+        dropzone.addEventListener('dragleave', function (e) {
+          e.preventDefault();
+          dropzone.classList.remove('border-slate-800', 'bg-slate-50');
+        });
+
+        dropzone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          dropzone.classList.remove('border-slate-800', 'bg-slate-50');
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            handleFile(e.dataTransfer.files[0]);
+          }
+        });
+
+        window.addEventListener('paste', function (e) {
+          var text = (e.clipboardData || window.clipboardData).getData('text');
+          if (text && text.indexOf(',') !== -1) {
+            appState.fileName = 'clipboard-pasted.csv';
+            var parsed = parseCsvText(text);
+            sanitizeData(parsed);
+            renderWorkspace();
+          }
+        });
+
+        function loadSample() {
+          appState.fileName = 'messy-notion-sample.csv';
+          var parsed = parseCsvText(SAMPLE_CSV);
+          sanitizeData(parsed);
+          renderWorkspace();
+        }
+
+        btnSampleTop.addEventListener('click', loadSample);
+        btnSampleDrop.addEventListener('click', function (e) {
+          e.stopPropagation();
+          loadSample();
+        });
+
+        btnOpenAnother.addEventListener('click', function () {
+          workspaceView.classList.add('hidden');
+          dropView.classList.remove('hidden');
+          fileInput.value = '';
+        });
+
+        btnToggleFilter.addEventListener('click', function () {
+          appState.filterOnlyModified = !appState.filterOnlyModified;
+          btnToggleFilter.textContent = appState.filterOnlyModified ? 'Showing Modified Rows Only' : 'Showing All Rows';
+          renderTableRows();
+        });
+
+        btnCopyCsv.addEventListener('click', function () {
+          var cleanCsv = exportCsvString();
+          navigator.clipboard.writeText(cleanCsv).then(function () {
+            copyBtnText.textContent = 'Copied!';
+            setTimeout(function () {
+              copyBtnText.textContent = 'Copy CSV';
+            }, 2000);
+          });
+        });
+
+        btnDownloadClean.addEventListener('click', function () {
+          var cleanCsv = exportCsvString();
+          var outName = appState.fileName ? appState.fileName.replace(/\.[^/.]+$/, '') + '-notion-ready.csv' : 'notion-ready.csv';
+          var blob = new Blob([cleanCsv], { type: 'text/csv;charset=utf-8;' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = outName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        });
+
+        // Initialize icons
+        if (window.lucide && window.lucide.createIcons) {
+          window.lucide.createIcons();
+        }
+      })();
+    </script>
+  </body>
+</html>
